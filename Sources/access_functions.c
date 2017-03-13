@@ -1,253 +1,204 @@
 #include "access_functions.h"
 
 
-_task_id dd_tcreate(unit_32 template_index, unit_32 deadline){
+_task_id dd_tcreate(uint32_t template_index, uint32_t deadline, uint32_t execution_time){
+	/*create tasks*/
+	_task_id new_tid = _task_create(0, template_index, execution_time);
+	MSG_PTR msg_ptr = (MSG_PTR)_msg_alloc(msg_pool);
+	_time_get_elapsed(&start_t);
 
-	return 0;
+//	printf("tid %d id created\n",new_tid);
+
+	msg_ptr->HEADER.SOURCE_QID = tcreate_qid;
+	msg_ptr->HEADER.TARGET_QID = _msgq_get_id(0, DD_QUEUE);
+	msg_ptr->HEADER.SIZE = sizeof(MESSAGE_HEADER_STRUCT) + sizeof(int)*4;
+	msg_ptr->tid = new_tid;
+	msg_ptr->deadline = deadline;
+	msg_ptr->creation_time = start_t.SECONDS;
+	delay(500);
+
+	/*send msg to dd_scheduler*/
+	_msgq_send(msg_ptr);
+
+//	_msg_free(msg_ptr);
+
+	return new_tid;
 }
 
 
-uint_32 dd_delete(uint_32 task_id){
-	return 0;
+uint32_t dd_delete(_task_id task_id,uint32_t creation_time){
+	MSG_PTR msg_ptr = (MSG_PTR)_msg_alloc(msg_pool);
+	puts("im deleting>>>");
+	msg_ptr->HEADER.SOURCE_QID = delete_qid;
+	msg_ptr->HEADER.TARGET_QID = _msgq_get_id(0, DD_QUEUE);
+	msg_ptr->HEADER.SIZE = sizeof(MESSAGE_HEADER_STRUCT) + sizeof(int)*4;
+	msg_ptr->tid = task_id;
+	msg_ptr->deadline = 0;
+	msg_ptr->creation_time = creation_time;
+
+	/*send msg to dd_scheduler with tid and creation time*/
+	_msgq_send(msg_ptr);
+//	_msg_free(msg_ptr);
+
+	return task_id;
 }
 
-uint_32 dd_return_active_list(task_list **list){
-	return 0;
+uint32_t dd_return_active_list(task_list **list){
+	return *list;
 }
 
-uint_32 dd_return_overdue_list(task_list **list){
-	return 0;
+uint32_t dd_return_overdue_list(task_list **list){
+	return *list;
 }
 
 void dd_init(){
-	return 0;
+	return;
 
+}
+
+int generateRandom(int l, int u){
+    int result = (rand() % (u - l)) + l;
+//    printf("result>>>%d\n",result);
+    return result;
+}
+
+
+void delay(int val){
+	for ( int c = 1 ; c <= val ; c++ )
+		   for (int d = 1 ; d <= val ; d++ )
+		   {}
 }
 
 
 /*linked list functions*/
-bool isEmpty(task_list *head){
-	return head ==NULL;
-}
 
-int length(task_list *head){
+int length(task_list **head){
 	   int length = 0;
 	   task_list *current;
 
-	   for(current = head; current != NULL; current = current->next_cell){
+	   for(current = *head; current != NULL; current = current->next_cell){
 	      length++;
 	   }
 
 	   return length;
 }
 
-void displayForward(task_list *head) {
-
+void displayForward(task_list* head) {
    //start from the beginning
    task_list *ptr = head;
 
    //navigate till the end of the list
-   printf("\n[ ");
+   printf("\n[");
 
    while(ptr != NULL) {
-      printf("(%d,%d) ",ptr->tid,ptr->creation_time);
+      printf("(tid:%d, c:%d, d:%d) ",ptr->tid,ptr->creation_time, ptr->deadline);
       ptr = ptr->next_cell;
    }
 
-   printf(" ]");
+   printf("]\n\n");
 }
 
-void displayBackward(task_list *head) {
-
-   //start from the last
-	task_list *ptr = last;
-
-   //navigate till the start of the list
-   printf("\n[ ");
-
-   while(ptr != NULL) {
-
-      //print data
-      printf("(%d,%d) ",ptr->tid,ptr->creation_time);
-
-      //move to next item
-      ptr = ptr ->previous_cell;
-      printf(" ");
-   }
-
-   printf(" ]");
-}
 
 //insert link at the first location
-void insertFirst(task_list *head, task_list *tail, uint_32 tid, uint_32 deadline, uint_32 creation_time) {
+void insert(task_list** head, task_list** last, uint32_t tid, uint32_t deadline, uint32_t creation_time) {
    //create a link
    task_list *link = (task_list*) malloc(sizeof(task_list));
    link->tid = tid;
    link->deadline = deadline;
    link->creation_time = creation_time;
+   link->next_cell = NULL;
+   link->previous_cell = NULL;
 
-   if(isEmpty()) {
-	  //make it the last link
-	  tail = link;
-   } else {
-	  //update first prev link
-	  head->previous_cell = link;
+   task_list* current = *head;
+
+   /*if list is empty*/
+   if(*head == NULL){
+	   *last = link;
+	   *head = link;
+	   return;
    }
 
-   //point it to old first link
-   link->next_cell = head;
+   int i = 0;
 
-   //point first to new first link
-   head = link;
-}
-
-//insert link at the last location
-void insertLast(task_list *tail, uint_32 tid, uint_32 deadline, uint_32 creation_time) {
-
-   //create a link
-   task_list *link = (task_list*) malloc(sizeof(task_list));
-   link->tid = tid;
-   link->deadline = deadline;
-   link->creation_time = creation_time;
-
-   if(isEmpty()) {
-      //make it the last link
-	   tail = link;
-   } else {
-      //make link a new last link
-	   tail->next_cell = link;
-
-      //mark old last node as prev of new link
-      link->previous_cell = tail;
+   while(current->deadline < deadline){
+	   /*if it is last node*/
+	   if(current->next_cell == NULL){
+		   break;
+	   }else{
+		   current = current->next_cell;
+	   }
    }
 
-   //point last to new last node
-   tail = link;
-}
+   if(current == *last){
+	   if((*last)->deadline < deadline){
+		   link->next_cell = NULL;
+		   *last = link;
+		   link->previous_cell = current;
+		   current->next_cell = link;
+		   return;
+	   }else{
+		   link->next_cell = *last;
+		   link->previous_cell = (*last)->previous_cell;
+		   (*last)->previous_cell->next_cell = link;
+		   (*last)->previous_cell = link;
+		   return;
+	   }
 
-//delete first item
-task_list* deleteFirst(task_list *head, task_list *last) {
-
-   //save reference to first link
-	task_list *tempLink = head;
-
-   //if only one link
-   if(head->next_cell == NULL){
-      last = NULL;
-   } else {
-      head->next->previous_cell = NULL;
+   }else{
+	   link->next_cell = current;
+	   if(current != *head){
+		   link->previous_cell = current->previous_cell;
+		   current->previous_cell->next_cell = link;
+	   }
+	   current->previous_cell= link;
+	   if(current == *head){
+		   *head = link;
+	   }
+	   return;
    }
 
-   head = head->next_cell;
-   //return the deleted link
-   free(tempLink);
-   return tempLink;
-}
 
-task_list* deleteLast(task_list *head, task_list *last) {
-   //save reference to last link
-	task_list *tempLink = last;
-
-   //if only one link
-   if(head->next_cell == NULL) {
-      head = NULL;
-   } else {
-      last->previous_cell->next_cell = NULL;
-   }
-
-   last = last->previous_cell;
-
-   free(tempLink);
-   //return the deleted link
-   return tempLink;
 }
 
 //delete according to tid
-task_list* delete(task_list* head, uint_32 tid, task_list *last) {
+void delete(task_list** head, task_list** last, uint32_t tid, uint32_t creation_time) {
 
-   //start from the first link
-   task_list* current = head;
-   task_list* previous = NULL;
+	task_list* current = *head;
+	task_list* previous = NULL;
 
-   //if list is empty
-   if(head == NULL) {
-      return NULL;
-   }
+//	printf("%d, %d\n",*head->tid, *head->creation_time);
+	if(*head == NULL){
+		return;
+	}
 
-   //navigate through list
-   while(current->tid != tid) {
-      //if it is last node
+	while((current->tid != tid) || (current->creation_time != creation_time)){
+		if(current->next_cell == NULL){
+			return;
+		}else{
+			previous = current;
+			current = current->next_cell;
+		}
+	}
 
-      if(current->next_cell == NULL) {
-         return NULL;
-      } else {
-         //store reference to current link
-         previous = current;
+	if(current == *head){
+		*head = (*head)->next_cell;
+	}else{
+		current->previous_cell->next_cell = current->next_cell;
+	}
 
-         //move to next link
-         current = current->next_cell;
-      }
-   }
+	if(current == *last){
+		*last = current->previous_cell;
+	}else{
+		current->next_cell->previous_cell = current->previous_cell;
+	}
 
-   //found a match, update the link
-   if(current == head) {
-      //change first to point to next link
-      head = head->next_cell;
-   } else {
-      //bypass the current link
-      current->previous_cell->next_cell = current->next_cell;
-   }
-
-   if(current == last) {
-      //change last to point to prev link
-      last = current->previous_cell;
-   } else {
-      current->next_cell->previous_cell = current->previous_cell;
-   }
-
-   free(current);
-   return current;
 }
 
-bool insertAfter(task_list* head, uint_32 tid, task_list *last, uint_32 newtid, uint_32 deadline, uint_32 creation_time) {
-   //start from the first link
-	task_list* current = head;
 
-   //if list is empty
-   if(head == NULL) {
-      return false;
-   }
 
-   //navigate through list
-   while(current->tid != tid) {
 
-      //if it is last node
-      if(current->next_cell == NULL) {
-         return false;
-      } else {
-         //move to next link
-         current = current->next_cell;
-      }
-   }
 
-   //create a link
-   task_list* newLink = (task_list*) malloc(sizeof(task_list));
-   newLink->tid = newtid;
-   newLink->deadline = deadline;
-   newLink->creation_time = creation_time;
 
-   if(current == last) {
-      newLink->next_cell = NULL;
-      last = newLink;
-   } else {
-      newLink->next_cell = current->next_cell;
-      current->next_cell->previous_cell = newLink;
-   }
-
-   newLink->previous_cell = current;
-   current->next_cell = newLink;
-   return true;
-}
 
 
 
