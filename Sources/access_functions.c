@@ -1,11 +1,28 @@
 #include "access_functions.h"
 
 
-_task_id dd_tcreate(uint32_t template_index, uint32_t deadline, uint32_t execution_time){
+_task_id dd_tcreate(uint32_t template_index, uint32_t deadline){
+
+
+	_mqx_uint old_priority_ptr;
+	_mqx_uint priority_ptr = 12;
+
+	/*Create queue for dd_tcreate*/
+	tcreate_qid = _msgq_open(TCREAT_QUEUE, 0);
+	if(tcreate_qid == 0){
+		printf("\nCould not open the tcreate queue\n");
+		_task_block();
+	}
+
 	/*create tasks*/
-	_task_id new_tid = _task_create(0, template_index, execution_time);
+	_task_id new_tid = _task_create(0, template_index,0);
 	MSG_PTR msg_ptr = (MSG_PTR)_msg_alloc(msg_pool);
 	_time_get_elapsed(&start_t);
+
+	// change priority of the task to 12
+	_task_get_priority(new_tid, &old_priority_ptr);
+	_task_set_priority(new_tid, priority_ptr, &old_priority_ptr);
+	printf("old pri: %d,  new pri: %d\n", old_priority_ptr, priority_ptr );
 
 //	printf("tid %d id created\n",new_tid);
 
@@ -13,12 +30,23 @@ _task_id dd_tcreate(uint32_t template_index, uint32_t deadline, uint32_t executi
 	msg_ptr->HEADER.TARGET_QID = _msgq_get_id(0, DD_QUEUE);
 	msg_ptr->HEADER.SIZE = sizeof(MESSAGE_HEADER_STRUCT) + sizeof(int)*4;
 	msg_ptr->tid = new_tid;
+//	msg_ptr->execution_time = execution_time;
 	msg_ptr->deadline = deadline;
 	msg_ptr->creation_time = start_t.SECONDS;
-	delay(500);
+	msg_ptr->priority = priority_ptr;
 
 	/*send msg to dd_scheduler*/
+//	printf("qid in access %d\n",tcreate_qid);
+
 	_msgq_send(msg_ptr);
+	msg_ptr = _msgq_receive(tcreate_qid, 0);
+	if(msg_ptr->tid == new_tid){
+		puts("\nTask in scheduled list\n");
+		_msgq_close(tcreate_qid);
+		_msg_free(msg_ptr);
+	}else{
+		printf("tid>>>%d\n", msg_ptr->tid);
+	}
 
 //	_msg_free(msg_ptr);
 
@@ -85,6 +113,7 @@ int length(task_list **head){
 
 void displayForward(task_list* head) {
    //start from the beginning
+
    task_list *ptr = head;
 
    //navigate till the end of the list
@@ -106,6 +135,7 @@ void insert(task_list** head, task_list** last, uint32_t tid, uint32_t deadline,
    link->tid = tid;
    link->deadline = deadline;
    link->creation_time = creation_time;
+//   link->execution_time = execution_time;
    link->next_cell = NULL;
    link->previous_cell = NULL;
 
@@ -193,6 +223,20 @@ void delete(task_list** head, task_list** last, uint32_t tid, uint32_t creation_
 	}
 
 }
+
+// might have to call task_block on each created task, so scheduler can unblock and run
+void schedule_task(_task_id tid)
+{
+	TD_STRUCT_PTR td_ptr = _task_get_td(tid);
+	if ((td_ptr != NULL) && (td_ptr->STATE == WAIT_BLOCKED)){
+	 _task_ready(td_ptr);
+	}
+
+}
+
+
+
+
 
 
 
