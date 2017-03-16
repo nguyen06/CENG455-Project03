@@ -1,9 +1,3 @@
-/*
- * global_variables.h
- *
- *  Created on: Feb 6, 2017
- *      Author: nguyen06
- */
 #include <mqx.h>
 #include <message.h>
 #include <mutex.h>
@@ -38,9 +32,9 @@ int counter;// = 11;
 char Cr = 0x0d;
 //int srand_;
 
-
-
-
+　
+　
+　
 //message structure
 typedef struct{
 	MESSAGE_HEADER_STRUCT HEADER;
@@ -50,7 +44,7 @@ typedef struct{
 	_mqx_uint priority;
 }MESSAGE, *MSG_PTR;
 
-
+　
 //task structure
 typedef struct t_list{
 	uint32_t tid;
@@ -78,6 +72,6 @@ _task_id running_task = 0;
 
 _pool_id msg_pool;
 
-
-
+　
+　
 #endif /* SOURCES_GLOBAL_VARIABLES_H_ */
