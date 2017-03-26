@@ -25,12 +25,7 @@ _queue_id dd_qid;
 _queue_id tcreate_qid;
 _queue_id delete_qid;
 
-char output_buf[200];
-char putline_buf[200];
-char getline_buf[200];
-int counter;// = 11;
-char Cr = 0x0d;
-//int srand_;
+
 
 　
 　
